@@ -1,0 +1,187 @@
+/* ?? Koko Palette: https://coolors.co/palette/243010-87a330-a1c349-cad593-2a3c24 ?? */
+:root {
+    --koko-deep:      #243010;
+    --koko-olive:     #87A330;
+    --koko-lime:      #A1C349;
+    --koko-sage:      #CAD593;
+    --koko-dark-teal: #2A3C24;
+
+    /* Transparent variants for chart fills */
+    --koko-olive-20:  rgba(135, 163, 48, 0.2);
+    --koko-lime-20:   rgba(161, 195, 73, 0.2);
+    --koko-sage-40:   rgba(202, 213, 147, 0.4);
+    --koko-deep-10:   rgba(36, 48, 16, 0.1);
+}
+
+html {
+    font-size: 14px;
+}
+
+@media (min-width: 768px) {
+    html {
+        font-size: 16px;
+    }
+}
+
+html {
+    position: relative;
+    min-height: 100%;
+}
+
+body {
+    margin-bottom: 60px;
+    background-color: #f8faf4;             /* very faint sage tint */
+    color: var(--koko-deep);
+}
+
+/* ?? Focus ring ?? */
+.btn:focus,
+.btn:active:focus,
+.btn-link.nav-link:focus,
+.form-control:focus,
+.form-check-input:focus {
+    box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem var(--koko-olive);
+}
+
+/* ?? Navbar ?? */
+.navbar-koko {
+    background-color: var(--koko-deep) !important;
+}
+
+.navbar-koko .navbar-brand,
+.navbar-koko .nav-link {
+    color: var(--koko-sage) !important;
+    font-weight: 500;
+    transition: color 0.2s;
+}
+
+.navbar-koko .navbar-brand:hover,
+.navbar-koko .nav-link:hover,
+.navbar-koko .nav-link.active {
+    color: #fff !important;
+}
+
+.navbar-koko .navbar-toggler {
+    border-color: var(--koko-olive);
+}
+
+.navbar-koko .navbar-toggler-icon {
+    filter: invert(1);
+}
+
+/* ?? Primary button overrides ?? */
+.btn-koko {
+    background-color: var(--koko-olive);
+    border-color: var(--koko-olive);
+    color: #fff;
+}
+
+.btn-koko:hover,
+.btn-koko:focus {
+    background-color: var(--koko-lime);
+    border-color: var(--koko-lime);
+    color: var(--koko-deep);
+}
+
+.btn-outline-koko {
+    color: var(--koko-olive);
+    border-color: var(--koko-olive);
+}
+
+.btn-outline-koko:hover,
+.btn-outline-koko.active {
+    background-color: var(--koko-olive);
+    border-color: var(--koko-olive);
+    color: #fff;
+}
+
+/* ?? Cards ?? */
+.card-koko {
+    border: none;
+    border-left: 4px solid var(--koko-olive);
+}
+
+.card-koko-accent {
+    background: linear-gradient(135deg, var(--koko-deep), var(--koko-dark-teal));
+    color: #fff;
+}
+
+.card-koko-accent .text-muted {
+    color: var(--koko-sage) !important;
+}
+
+/* ?? Summary stat highlight ?? */
+.stat-card {
+    border: none;
+    border-radius: 0.5rem;
+    transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(36, 48, 16, 0.12);
+}
+
+/* ?? Badges ?? */
+.badge-koko-up {
+    background-color: var(--koko-olive);
+    color: #fff;
+}
+
+.badge-koko-down {
+    background-color: #c0392b;
+    color: #fff;
+}
+
+.badge-koko-neutral {
+    background-color: var(--koko-sage);
+    color: var(--koko-deep);
+}
+
+/* ?? Progress bars ?? */
+.progress-bar-koko {
+    background-color: var(--koko-lime);
+}
+
+/* ?? Table header ?? */
+.table-koko thead {
+    background-color: var(--koko-deep);
+    color: var(--koko-sage);
+}
+
+.table-koko thead th {
+    border: none;
+    font-weight: 600;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+/* ?? Footer ?? */
+.footer-koko {
+    background-color: var(--koko-dark-teal);
+    color: var(--koko-sage);
+}
+
+.footer-koko a {
+    color: var(--koko-lime);
+}
+
+.footer-koko a:hover {
+    color: #fff;
+}
+
+/* ?? Date preset pills ?? */
+.date-pill {
+    border-radius: 999px;
+    font-size: 0.8rem;
+    padding: 0.3rem 0.85rem;
+}
+
+/* ?? Sparkline container ?? */
+.sparkline-box {
+    background-color: #fff;
+    border-radius: 0.5rem;
+    padding: 0.75rem;
+    border: 1px solid var(--koko-sage);
+}

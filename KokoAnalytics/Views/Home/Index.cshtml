@@ -1,0 +1,458 @@
+﻿@model KokoAnalytics.Models.DashboardViewModel
+@{
+    ViewData["Title"] = "Dashboard";
+    var jsonLabels = System.Text.Json.JsonSerializer.Serialize(Model.ChartLabels);
+    var jsonViews = System.Text.Json.JsonSerializer.Serialize(Model.ChartViews);
+    var jsonVisitors = System.Text.Json.JsonSerializer.Serialize(Model.ChartVisitors);
+    var jsonBounce = System.Text.Json.JsonSerializer.Serialize(Model.ChartBounceRates);
+    var jsonRefLabels = System.Text.Json.JsonSerializer.Serialize(Model.ReferrerLabels);
+    var jsonRefData = System.Text.Json.JsonSerializer.Serialize(Model.ReferrerData);
+    var jsonSparklines = System.Text.Json.JsonSerializer.Serialize(
+        Model.PageSparklines.Select(s => new { s.PageTitle, s.DailyViews }));
+}
+
+<div class="container-fluid">
+
+    <!-- Header + Date Range Picker -->
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap">
+        <h1 class="mb-2" style="color:var(--koko-deep);">🌿 Analytics Dashboard</h1>
+        <form method="get" class="d-flex align-items-center flex-wrap gap-2">
+            <div class="input-group input-group-sm">
+                <span class="input-group-text" style="background:var(--koko-deep);color:var(--koko-sage);border-color:var(--koko-deep);">From</span>
+                <input type="date" name="start" class="form-control"
+                       value="@Model.StartDate.ToString("yyyy-MM-dd")" />
+            </div>
+            <div class="input-group input-group-sm">
+                <span class="input-group-text" style="background:var(--koko-deep);color:var(--koko-sage);border-color:var(--koko-deep);">To</span>
+                <input type="date" name="end" class="form-control"
+                       value="@Model.EndDate.ToString("yyyy-MM-dd")" />
+            </div>
+            <button type="submit" class="btn btn-koko btn-sm">Apply</button>
+            <a asp-action="Index" class="btn btn-outline-koko btn-sm">Reset</a>
+        </form>
+    </div>
+
+    <!-- Quick-select date buttons -->
+    <div class="mb-4">
+        @{
+            var today = DateTime.Today;
+            var presets = new (string Label, DateTime S, DateTime E)[]
+            {
+                ("Today",       today, today),
+                ("Last 7 days", today.AddDays(-6), today),
+                ("Last 30 days",today.AddDays(-29), today),
+                ("Last 90 days",today.AddDays(-89), today),
+                ("This month",  new DateTime(today.Year, today.Month, 1), today),
+                ("This year",   new DateTime(today.Year, 1, 1), today)
+            };
+        }
+        @foreach (var p in presets)
+        {
+            var isActive = Model.StartDate.Date == p.S.Date && Model.EndDate.Date == p.E.Date;
+            <a asp-action="Index"
+               asp-route-start="@p.S.ToString("yyyy-MM-dd")"
+               asp-route-end="@p.E.ToString("yyyy-MM-dd")"
+               class="btn btn-sm date-pill mb-1 me-1 @(isActive ? "btn-koko" : "btn-outline-koko")">
+                @p.Label
+            </a>
+        }
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="row g-3 mb-4">
+        <!-- Total Views -->
+        <div class="col-6 col-lg-3">
+            <div class="card stat-card h-100 card-koko shadow-sm">
+                <div class="card-body">
+                    <div class="text-muted small text-uppercase">Total Views</div>
+                    <h2 class="mb-1" style="color:var(--koko-deep);">@Model.TotalViewsInRange.ToString("N0")</h2>
+                    @{ var vt = Model.ViewsTrendPercent; }
+                    <span class="badge @(vt >= 0 ? "badge-koko-up" : "badge-koko-down")">
+                        @(vt >= 0 ? "▲" : "▼") @Math.Abs(vt).ToString("F1")%
+                    </span>
+                    <small class="text-muted ms-1">vs previous period</small>
+                </div>
+            </div>
+        </div>
+        <!-- Total Visitors -->
+        <div class="col-6 col-lg-3">
+            <div class="card stat-card h-100 card-koko shadow-sm">
+                <div class="card-body">
+                    <div class="text-muted small text-uppercase">Total Visitors</div>
+                    <h2 class="mb-1" style="color:var(--koko-deep);">@Model.TotalVisitorsInRange.ToString("N0")</h2>
+                    @{ var vtv = Model.VisitorsTrendPercent; }
+                    <span class="badge @(vtv >= 0 ? "badge-koko-up" : "badge-koko-down")">
+                        @(vtv >= 0 ? "▲" : "▼") @Math.Abs(vtv).ToString("F1")%
+                    </span>
+                    <small class="text-muted ms-1">vs previous period</small>
+                </div>
+            </div>
+        </div>
+        <!-- Avg Bounce Rate -->
+        <div class="col-6 col-lg-3">
+            <div class="card stat-card h-100 card-koko shadow-sm">
+                <div class="card-body">
+                    <div class="text-muted small text-uppercase">Avg Bounce Rate</div>
+                    <h2 class="mb-1" style="color:var(--koko-deep);">@Model.AvgBounceRateInRange.ToString("F1")%</h2>
+                    <small class="text-muted">over selected range</small>
+                </div>
+            </div>
+        </div>
+        <!-- Today snapshot (accent card) -->
+        <div class="col-6 col-lg-3">
+            <div class="card stat-card h-100 card-koko-accent shadow-sm">
+                <div class="card-body">
+                    <div class="small text-uppercase" style="color:var(--koko-sage);">Today</div>
+                    <div><strong>@Model.TotalViewsToday.ToString("N0")</strong> views</div>
+                    <div><strong>@Model.TotalVisitorsToday.ToString("N0")</strong> visitors</div>
+                    <div><strong>@Model.BounceRateToday.ToString("F1")%</strong> bounce</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Charts Row -->
+    <div class="row g-3 mb-4">
+        <!-- Traffic chart -->
+        <div class="col-lg-8">
+            <div class="card h-100 border-0 shadow-sm">
+                <div class="card-header d-flex justify-content-between border-0 bg-white">
+                    <h6 class="mb-0" style="color:var(--koko-deep);">Views &amp; Visitors Over Time</h6>
+                    <div class="btn-group btn-group-sm" role="group" id="chartToggle">
+                        <button type="button" class="btn btn-outline-koko active" onclick="setChartType('line')">Line</button>
+                        <button type="button" class="btn btn-outline-koko" onclick="setChartType('bar')">Bar</button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <canvas id="trafficChart" height="90"></canvas>
+                </div>
+            </div>
+        </div>
+        <!-- Referrer doughnut -->
+        <div class="col-lg-4">
+            <div class="card h-100 border-0 shadow-sm">
+                <div class="card-header border-0 bg-white">
+                    <h6 class="mb-0" style="color:var(--koko-deep);">Referrer Sources</h6>
+                </div>
+                <div class="card-body d-flex align-items-center justify-content-center">
+                    <canvas id="referrerDoughnut"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bounce Rate Chart -->
+    <div class="row g-3 mb-4">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header border-0 bg-white">
+                    <h6 class="mb-0" style="color:var(--koko-deep);">Daily Bounce Rate (%)</h6>
+                </div>
+                <div class="card-body">
+                    <canvas id="bounceChart" height="60"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Page Sparklines -->
+    @if (Model.PageSparklines.Any())
+    {
+        <div class="row g-3 mb-4">
+            <div class="col-12">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header border-0 bg-white">
+                        <h6 class="mb-0" style="color:var(--koko-deep);">Top Pages – Daily Trend</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            @for (var i = 0; i < Model.PageSparklines.Count; i++)
+                            {
+                                <div class="col-md-4 col-lg">
+                                    <div class="sparkline-box">
+                                        <div class="text-muted small text-truncate mb-1">@Model.PageSparklines[i].PageTitle</div>
+                                        <canvas id="spark-@i" height="40"></canvas>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- Tables Row -->
+    <div class="row g-3 mb-4">
+        <!-- Top Pages -->
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header border-0 bg-white">
+                    <h6 class="mb-0" style="color:var(--koko-deep);">Top Pages</h6>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table-hover table-koko mb-0 table">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Page</th>
+                                    <th class="text-end">Views</th>
+                                    <th class="text-end">Unique</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @{ var rank = 0; }
+                                @foreach (var _page in Model.TopPages)
+                                {
+                                    rank++;
+                                    <tr>
+                                        <td class="text-muted">@rank</td>
+                                        <td>
+                                            <strong class="d-block text-truncate" style="max-width:280px;color:var(--koko-deep);">@_page.PageTitle</strong>
+                                            <small class="text-muted text-truncate d-block" style="max-width:280px;">@_page.PageUrl</small>
+                                        </td>
+                                        <td class="fw-bold text-end" style="color:var(--koko-olive);">@_page.TotalViews.ToString("N0")</td>
+                                        <td class="text-end">@_page.TotalUniqueVisitors.ToString("N0")</td>
+                                    </tr>
+                                }
+                                @if (!Model.TopPages.Any())
+                                {
+                                    <tr><td colspan="4" class="text-muted py-4 text-center">No page data for this period.</td></tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Top Referrers -->
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header border-0 bg-white">
+                    <h6 class="mb-0" style="color:var(--koko-deep);">Top Referrers</h6>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table-hover table-koko mb-0 table">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Referrer</th>
+                                    <th class="text-end">Visits</th>
+                                    <th style="width:35%">Share</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @{
+                                    var rRank = 0;
+                                    var maxVisits = Model.TopReferrers.FirstOrDefault()?.TotalVisits ?? 1;
+                                }
+                                @foreach (var referrer in Model.TopReferrers)
+                                {
+                                    rRank++;
+                                    var pct = (int)Math.Round(referrer.TotalVisits / (double)maxVisits * 100);
+                                    <tr>
+                                        <td class="text-muted">@rRank</td>
+                                        <td class="text-truncate" style="max-width:220px;">@referrer.ReferrerUrl</td>
+                                        <td class="fw-bold text-end" style="color:var(--koko-olive);">@referrer.TotalVisits.ToString("N0")</td>
+                                        <td>
+                                            <div class="progress" style="height:8px;background:var(--koko-deep-10);">
+                                                <div class="progress-bar progress-bar-koko" style="width:@(pct)%;"></div>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                                @if (!Model.TopReferrers.Any())
+                                {
+                                    <tr><td colspan="4" class="text-muted py-4 text-center">No referrer data for this period.</td></tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script>
+        // ── Palette constants ──
+        const DEEP      = '#243010';
+        const OLIVE     = '#87A330';
+        const LIME      = '#A1C349';
+        const SAGE      = '#CAD593';
+        const DARK_TEAL = '#2A3C24';
+
+        const OLIVE_20  = 'rgba(135,163,48,0.2)';
+        const LIME_20   = 'rgba(161,195,73,0.2)';
+        const SAGE_40   = 'rgba(202,213,147,0.4)';
+        const OLIVE_70  = 'rgba(135,163,48,0.7)';
+        const LIME_70   = 'rgba(161,195,73,0.7)';
+
+        // ── Shared data ──
+        const labels     = @Html.Raw(jsonLabels);
+        const views      = @Html.Raw(jsonViews);
+        const visitors   = @Html.Raw(jsonVisitors);
+        const bounceData = @Html.Raw(jsonBounce);
+        const refLabels  = @Html.Raw(jsonRefLabels);
+        const refData    = @Html.Raw(jsonRefData);
+        const sparklines = @Html.Raw(jsonSparklines);
+
+        // ── Chart.js global defaults ──
+        Chart.defaults.font.family = 'inherit';
+        Chart.defaults.color = DEEP;
+
+        // ── 1. Traffic line / bar chart ──
+        let trafficChart;
+        function buildTrafficChart(type) {
+            const ctx = document.getElementById('trafficChart').getContext('2d');
+            if (trafficChart) trafficChart.destroy();
+            trafficChart = new Chart(ctx, {
+                type: type,
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Views',
+                            data: views,
+                            borderColor: OLIVE,
+                            backgroundColor: type === 'line' ? OLIVE_20 : OLIVE_70,
+                            fill: type === 'line',
+                            tension: 0.35,
+                            borderWidth: 2.5,
+                            pointRadius: type === 'line' ? 3 : 0,
+                            pointBackgroundColor: OLIVE,
+                            pointHoverRadius: 5
+                        },
+                        {
+                            label: 'Visitors',
+                            data: visitors,
+                            borderColor: LIME,
+                            backgroundColor: type === 'line' ? LIME_20 : LIME_70,
+                            fill: type === 'line',
+                            tension: 0.35,
+                            borderWidth: 2.5,
+                            pointRadius: type === 'line' ? 3 : 0,
+                            pointBackgroundColor: LIME,
+                            pointHoverRadius: 5
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        legend: { position: 'top', labels: { usePointStyle: true, padding: 16 } },
+                        tooltip: {
+                            mode: 'index',
+                            backgroundColor: DEEP,
+                            titleColor: SAGE,
+                            bodyColor: '#fff',
+                            cornerRadius: 8
+                        }
+                    },
+                    scales: {
+                        y: { beginAtZero: true, grid: { color: 'rgba(202,213,147,0.3)' } },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+        }
+        buildTrafficChart('line');
+
+        function setChartType(type) {
+            buildTrafficChart(type);
+            document.querySelectorAll('#chartToggle .btn').forEach(b => b.classList.remove('active'));
+            event.target.classList.add('active');
+        }
+
+        // ── 2. Referrer doughnut ──
+        const doughnutColors = [OLIVE, LIME, SAGE, DARK_TEAL, DEEP, 'rgba(135,163,48,0.4)'];
+        new Chart(document.getElementById('referrerDoughnut'), {
+            type: 'doughnut',
+            data: {
+                labels: refLabels,
+                datasets: [{
+                    data: refData,
+                    backgroundColor: doughnutColors,
+                    borderColor: '#fff',
+                    borderWidth: 2,
+                    hoverOffset: 10
+                }]
+            },
+            options: {
+                responsive: true,
+                cutout: '62%',
+                plugins: {
+                    legend: { position: 'bottom', labels: { boxWidth: 12, padding: 12, usePointStyle: true } },
+                    tooltip: { backgroundColor: DEEP, titleColor: SAGE, bodyColor: '#fff', cornerRadius: 8 }
+                }
+            }
+        });
+
+        // ── 3. Bounce rate bar chart ──
+        new Chart(document.getElementById('bounceChart'), {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Bounce Rate %',
+                    data: bounceData,
+                    backgroundColor: bounceData.map(v =>
+                        v > 70 ? '#c0392b' :        // red – high bounce
+                        v > 40 ? SAGE :              // sage – medium
+                                 OLIVE),             // olive – healthy
+                    borderRadius: 4,
+                    borderSkipped: false
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { backgroundColor: DEEP, titleColor: SAGE, bodyColor: '#fff', cornerRadius: 8 }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100,
+                        ticks: { callback: v => v + '%' },
+                        grid: { color: 'rgba(202,213,147,0.3)' }
+                    },
+                    x: { grid: { display: false } }
+                }
+            }
+        });
+
+        // ── 4. Page sparklines ──
+        sparklines.forEach((s, i) => {
+            const el = document.getElementById('spark-' + i);
+            if (!el) return;
+            new Chart(el, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: s.DailyViews || s.dailyViews,
+                        borderColor: OLIVE,
+                        backgroundColor: OLIVE_20,
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 0,
+                        borderWidth: 1.5
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: { legend: { display: false }, tooltip: { enabled: false } },
+                    scales: { x: { display: false }, y: { display: false, beginAtZero: true } }
+                }
+            });
+        });
+    </script>
+}

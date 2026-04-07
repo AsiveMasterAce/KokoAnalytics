@@ -1,0 +1,72 @@
+﻿@model KokoAnalytics.Models.ImportViewModel
+@{
+    ViewData["Title"] = "Import WordPress Data";
+}
+
+<div class="container">
+    <h1 class="mb-4">📥 Import from WordPress Koko Analytics</h1>
+
+    <div class="alert alert-info">
+        <h5>How to export from WordPress</h5>
+        <p class="mb-1">In phpMyAdmin or your MySQL client, run these queries and paste the resulting <code>INSERT INTO</code> statements below:</p>
+        <ol class="mb-0">
+            <li><code>SELECT * FROM wp_koko_analytics_site_stats;</code> → paste into <strong>Site Stats</strong></li>
+            <li><code>SELECT * FROM wp_koko_analytics_post_stats;</code> → paste into <strong>Post Stats</strong></li>
+            <li><code>SELECT * FROM wp_koko_analytics_referrer_urls;</code> → paste into <strong>Referrer URLs</strong></li>
+            <li><code>SELECT * FROM wp_koko_analytics_referrer_stats;</code> → paste into <strong>Referrer Stats</strong></li>
+        </ol>
+        <hr />
+        <p class="mb-0"><strong>Tip:</strong> In phpMyAdmin, click <em>Export</em> on each table with format "SQL" to get <code>INSERT INTO</code> statements.</p>
+    </div>
+
+    @if (!string.IsNullOrEmpty(Model.ResultMessage))
+    {
+        <div class="alert @(Model.IsSuccess ? "alert-success" : "alert-danger")">
+            <pre class="mb-0" style="white-space: pre-wrap;">@Model.ResultMessage</pre>
+        </div>
+    }
+
+    <form method="post" asp-action="Index" asp-controller="Import">
+        @Html.AntiForgeryToken()
+
+        <div class="card mb-3 shadow-sm">
+            <div class="card-header"><strong>1. Site Stats</strong> <span class="text-muted">(wp_koko_analytics_site_stats → DailyStats)</span></div>
+            <div class="card-body">
+                <textarea asp-for="SiteStatsSql" class="form-control font-monospace" rows="6"
+                          placeholder="INSERT INTO `wp_koko_analytics_site_stats` VALUES ('2024-01-01',150,320),('2024-01-02',175,410);"></textarea>
+                <small class="text-muted">Format: (date, visitors, pageviews)</small>
+            </div>
+        </div>
+
+        <div class="card mb-3 shadow-sm">
+            <div class="card-header"><strong>2. Post Stats</strong> <span class="text-muted">(wp_koko_analytics_post_stats → PageViews)</span></div>
+            <div class="card-body">
+                <textarea asp-for="PostStatsSql" class="form-control font-monospace" rows="6"
+                          placeholder="INSERT INTO `wp_koko_analytics_post_stats` VALUES (1,'2024-01-01',50,120),(2,'2024-01-01',30,80);"></textarea>
+                <small class="text-muted">Format: (post_id, date, visitors, pageviews)</small>
+            </div>
+        </div>
+
+        <div class="card mb-3 shadow-sm">
+            <div class="card-header"><strong>3. Referrer URLs</strong> <span class="text-muted">(wp_koko_analytics_referrer_urls → lookup table)</span></div>
+            <div class="card-body">
+                <textarea asp-for="ReferrerUrlsSql" class="form-control font-monospace" rows="4"
+                          placeholder="INSERT INTO `wp_koko_analytics_referrer_urls` VALUES (1,'https://google.com'),(2,'https://twitter.com');"></textarea>
+                <small class="text-muted">Format: (id, url) — needed to resolve referrer names in step 4</small>
+            </div>
+        </div>
+
+        <div class="card mb-3 shadow-sm">
+            <div class="card-header"><strong>4. Referrer Stats</strong> <span class="text-muted">(wp_koko_analytics_referrer_stats → Referrers)</span></div>
+            <div class="card-body">
+                <textarea asp-for="ReferrerStatsSql" class="form-control font-monospace" rows="6"
+                          placeholder="INSERT INTO `wp_koko_analytics_referrer_stats` VALUES ('2024-01-01',1,25,50),('2024-01-01',2,10,20);"></textarea>
+                <small class="text-muted">Format: (date, referrer_id, visitors, pageviews)</small>
+            </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-lg mb-4">
+            🚀 Import Data
+        </button>
+    </form>
+</div>  
