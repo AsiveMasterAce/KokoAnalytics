@@ -1,14 +1,15 @@
-using KokoAnalytics.Data;
-using KokoAnalytics.Services;
-using Microsoft.EntityFrameworkCore;
+using KokoAnalytics.Application;
+using KokoAnalytics.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddControllersWithViews();
-builder.Services.AddDbContext<AnalyticsDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
-builder.Services.AddScoped<WordPressImportService>();
+
+
+// Clean Architecture layers
+builder.Services.AddApplication();
+builder.Services.AddInfrastructure(builder.Configuration);
 
 // Allow antiforgery token via AJAX header
 builder.Services.AddAntiforgery(options =>
