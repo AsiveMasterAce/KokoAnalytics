@@ -1,9 +1,15 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
-VisualStudioVersion = 17.14.36705.20 d17.14
+VisualStudioVersion = 17.14.36705.20
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KokoAnalytics", "KokoAnalytics\KokoAnalytics.csproj", "{7ADC8E7E-8D5A-4049-8E93-FBD4F836DF01}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KokoAnalytics.Domain", "KokoAnalytics.Domain\KokoAnalytics.Domain.csproj", "{4E539022-5FEB-4ECA-BA6D-E6CBF454D7F8}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KokoAnalytics.Application", "KokoAnalytics.Application\KokoAnalytics.Application.csproj", "{53A816AB-BE2C-404C-8D0D-CFB7DE6F9925}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KokoAnalytics.Infrastructure", "KokoAnalytics.Infrastructure\KokoAnalytics.Infrastructure.csproj", "{96148C65-CFB8-44D2-99D3-4E64FF193068}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -15,6 +21,18 @@ Global
 		{7ADC8E7E-8D5A-4049-8E93-FBD4F836DF01}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{7ADC8E7E-8D5A-4049-8E93-FBD4F836DF01}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{7ADC8E7E-8D5A-4049-8E93-FBD4F836DF01}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4E539022-5FEB-4ECA-BA6D-E6CBF454D7F8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4E539022-5FEB-4ECA-BA6D-E6CBF454D7F8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4E539022-5FEB-4ECA-BA6D-E6CBF454D7F8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4E539022-5FEB-4ECA-BA6D-E6CBF454D7F8}.Release|Any CPU.Build.0 = Release|Any CPU
+		{53A816AB-BE2C-404C-8D0D-CFB7DE6F9925}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{53A816AB-BE2C-404C-8D0D-CFB7DE6F9925}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{53A816AB-BE2C-404C-8D0D-CFB7DE6F9925}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{53A816AB-BE2C-404C-8D0D-CFB7DE6F9925}.Release|Any CPU.Build.0 = Release|Any CPU
+		{96148C65-CFB8-44D2-99D3-4E64FF193068}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{96148C65-CFB8-44D2-99D3-4E64FF193068}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{96148C65-CFB8-44D2-99D3-4E64FF193068}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{96148C65-CFB8-44D2-99D3-4E64FF193068}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

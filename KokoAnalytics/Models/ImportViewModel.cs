@@ -29,4 +29,9 @@ namespace KokoAnalytics.Models
         public List<string> Errors { get; set; } = new();
         public List<string> Warnings { get; set; } = new();
     }
+
+    public class EasyImportRequest
+    {
+        public string? RawSqlDump { get; set; }
+    }
 }
