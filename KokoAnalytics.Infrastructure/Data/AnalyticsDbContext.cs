@@ -16,6 +16,14 @@ public class AnalyticsDbContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<DailyStat>().ToTable("DailyStats");
+        modelBuilder.Entity<PageView>().ToTable("PageViews");
+        modelBuilder.Entity<Referrer>().ToTable("Referrers");
+
+        modelBuilder.Entity<DailyStat>()
+            .Property(d => d.BounceRate)
+            .HasPrecision(18, 2);
+
         modelBuilder.Entity<DailyStat>()
             .HasIndex(d => d.Date)
             .IsUnique();

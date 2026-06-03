@@ -28,13 +28,13 @@ public class WordPressImportService : IImportService
         var model = SplitByTableName(rawSql);
 
         if (string.IsNullOrWhiteSpace(model.SiteStatsSql))
-            result.Warnings.Add("No site_stats data found — daily visitor summary won't be imported.");
+            result.Warnings.Add("No site_stats data found ï¿½ daily visitor summary won't be imported.");
         if (string.IsNullOrWhiteSpace(model.PostStatsSql))
-            result.Warnings.Add("No post_stats data found — page view breakdown won't be imported.");
+            result.Warnings.Add("No post_stats data found ï¿½ page view breakdown won't be imported.");
         if (string.IsNullOrWhiteSpace(model.ReferrerUrlsSql))
-            result.Warnings.Add("No referrer_urls data found — referrer names may show as \"unknown\".");
+            result.Warnings.Add("No referrer_urls data found ï¿½ referrer names may show as \"unknown\".");
         if (string.IsNullOrWhiteSpace(model.ReferrerStatsSql))
-            result.Warnings.Add("No referrer_stats data found — referrer traffic won't be imported.");
+            result.Warnings.Add("No referrer_stats data found ï¿½ referrer traffic won't be imported.");
 
         if (!string.IsNullOrWhiteSpace(model.SiteStatsSql))
         {
@@ -165,7 +165,7 @@ public class WordPressImportService : IImportService
             }
             catch (Exception ex)
             {
-                errors.Add($"Site stats: couldn't read row — {ex.Message}");
+                errors.Add($"Site stats: couldn't read row ï¿½ {ex.Message}");
             }
         }
 
@@ -194,10 +194,36 @@ public class WordPressImportService : IImportService
                 var fields = ParseFields(row);
                 if (fields.Count < 4) continue;
 
-                var postId = fields[0].Trim('\'', '"');
-                var date = DateTime.Parse(fields[1].Trim('\'', '"'));
-                var visitors = int.Parse(fields[2]);
-                var pageviewCount = int.Parse(fields[3]);
+                var normalizedFields = fields
+                    .Select(field => field.Trim('\'', '"'))
+                    .ToList();
+
+                var dateFieldIndex = normalizedFields.FindIndex(field => DateTime.TryParse(field, out _));
+                if (dateFieldIndex < 0)
+                    throw new FormatException("No DateTime field found.");
+
+                var date = DateTime.Parse(normalizedFields[dateFieldIndex]);
+                var postId = string.Empty;
+                for (var i = 0; i < normalizedFields.Count; i++)
+                {
+                    if (i == dateFieldIndex)
+                        continue;
+
+                    postId = normalizedFields[i];
+                    break;
+                }
+                var numericFields = normalizedFields
+                    .Where((_, index) => index != dateFieldIndex)
+                    .Select(field => int.TryParse(field, out var value) ? value : (int?)null)
+                    .Where(value => value.HasValue)
+                    .Select(value => value!.Value)
+                    .ToList();
+
+                if (numericFields.Count < 2)
+                    continue;
+
+                var visitors = numericFields[0];
+                var pageviewCount = numericFields[1];
 
                 pageViews.Add(new PageView
                 {
@@ -210,7 +236,7 @@ public class WordPressImportService : IImportService
             }
             catch (Exception ex)
             {
-                errors.Add($"Post stats: couldn't read row — {ex.Message}");
+                errors.Add($"Post stats: couldn't read row ï¿½ {ex.Message}");
             }
         }
 
@@ -271,7 +297,7 @@ public class WordPressImportService : IImportService
             }
             catch (Exception ex)
             {
-                errors.Add($"Referrer stats: couldn't read row — {ex.Message}");
+                errors.Add($"Referrer stats: couldn't read row ï¿½ {ex.Message}");
             }
         }
 
