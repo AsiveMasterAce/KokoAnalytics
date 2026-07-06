@@ -12,6 +12,7 @@
         <ol class="mb-0">
             <li><code>SELECT * FROM wp_koko_analytics_site_stats;</code> → paste into <strong>Site Stats</strong></li>
             <li><code>SELECT * FROM wp_koko_analytics_post_stats;</code> → paste into <strong>Post Stats</strong></li>
+            <li><code>SELECT * FROM wp_koko_analytics_paths;</code> → paste into <strong>Paths</strong> (needed to show real page names instead of "Post #id")</li>
             <li><code>SELECT * FROM wp_koko_analytics_referrer_urls;</code> → paste into <strong>Referrer URLs</strong></li>
             <li><code>SELECT * FROM wp_koko_analytics_referrer_stats;</code> → paste into <strong>Referrer Stats</strong></li>
         </ol>
@@ -48,7 +49,16 @@
         </div>
 
         <div class="card mb-3 shadow-sm">
-            <div class="card-header"><strong>3. Referrer URLs</strong> <span class="text-muted">(wp_koko_analytics_referrer_urls → lookup table)</span></div>
+            <div class="card-header"><strong>3. Paths</strong> <span class="text-muted">(wp_koko_analytics_paths → resolves page names)</span></div>
+            <div class="card-body">
+                <textarea asp-for="PathsSql" class="form-control font-monospace" rows="4"
+                          placeholder="INSERT INTO `wp_koko_analytics_paths` (id, path) VALUES (1,'/'),(2,'/contact/');"></textarea>
+                <small class="text-muted">Format: (id, path) — maps each post_stats path_id to its real URL/page name</small>
+            </div>
+        </div>
+
+        <div class="card mb-3 shadow-sm">
+            <div class="card-header"><strong>4. Referrer URLs</strong> <span class="text-muted">(wp_koko_analytics_referrer_urls → lookup table)</span></div>
             <div class="card-body">
                 <textarea asp-for="ReferrerUrlsSql" class="form-control font-monospace" rows="4"
                           placeholder="INSERT INTO `wp_koko_analytics_referrer_urls` VALUES (1,'https://google.com'),(2,'https://twitter.com');"></textarea>
@@ -57,7 +67,7 @@
         </div>
 
         <div class="card mb-3 shadow-sm">
-            <div class="card-header"><strong>4. Referrer Stats</strong> <span class="text-muted">(wp_koko_analytics_referrer_stats → Referrers)</span></div>
+            <div class="card-header"><strong>5. Referrer Stats</strong> <span class="text-muted">(wp_koko_analytics_referrer_stats → Referrers)</span></div>
             <div class="card-body">
                 <textarea asp-for="ReferrerStatsSql" class="form-control font-monospace" rows="6"
                           placeholder="INSERT INTO `wp_koko_analytics_referrer_stats` VALUES ('2024-01-01',1,25,50),('2024-01-01',2,10,20);"></textarea>

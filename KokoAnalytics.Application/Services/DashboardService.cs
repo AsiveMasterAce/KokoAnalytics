@@ -1,5 +1,6 @@
 using KokoAnalytics.Application.DTOs;
 using KokoAnalytics.Application.Interfaces;
+using KokoAnalytics.Application.Utilities;
 using KokoAnalytics.Domain.Interfaces;
 
 namespace KokoAnalytics.Application.Services;
@@ -18,6 +19,14 @@ public class DashboardService : IDashboardService
         _dailyStatRepo = dailyStatRepo;
         _pageViewRepo = pageViewRepo;
         _referrerRepo = referrerRepo;
+    }
+
+    /// <summary>
+    /// Gets the display title for a page, resolving "/" to "Home" and other paths to a friendly name
+    /// </summary>
+    private static string GetPageDisplayTitle(string pageUrl)
+    {
+        return PageNameGenerator.GetFriendlyName(pageUrl);
     }
 
     public async Task<DashboardDto> GetDashboardAsync(DateTime? start, DateTime? end)
@@ -53,7 +62,7 @@ public class DashboardService : IDashboardService
             .Select(g => new PageSummaryDto
             {
                 PageUrl = g.Key.PageUrl,
-                PageTitle = g.Key.PageTitle,
+                PageTitle = GetPageDisplayTitle(g.Key.PageUrl),
                 TotalViews = g.Sum(x => x.ViewCount),
                 TotalUniqueVisitors = g.Sum(x => x.UniqueVisitors)
             })
@@ -80,7 +89,7 @@ public class DashboardService : IDashboardService
                 .ToDictionary(s => s.Date, s => s.Views);
             return new PageSparklineDto
             {
-                PageTitle = sparklineData.FirstOrDefault(s => s.PageUrl == url)?.PageTitle ?? url,
+                PageTitle = GetPageDisplayTitle(url),
                 DailyViews = allDates.Select(d => byDate.GetValueOrDefault(d, 0)).ToList()
             };
         }).ToList();
@@ -141,11 +150,11 @@ public class DashboardService : IDashboardService
         try
         {
             var host = new Uri(url).Host.Replace("www.", "");
-            return host.Length > 20 ? host[..20] + "…" : host;
+            return host.Length > 20 ? host[..20] + "ï¿½" : host;
         }
         catch
         {
-            return url.Length > 25 ? url[..25] + "…" : url;
+            return url.Length > 25 ? url[..25] + "ï¿½" : url;
         }
     }
 }

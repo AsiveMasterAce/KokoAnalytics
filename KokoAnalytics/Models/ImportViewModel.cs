@@ -5,6 +5,7 @@ namespace KokoAnalytics.Models
         // Existing per-table fields (kept for the advanced Import page)
         public string? SiteStatsSql { get; set; }
         public string? PostStatsSql { get; set; }
+        public string? PathsSql { get; set; }
         public string? ReferrerUrlsSql { get; set; }
         public string? ReferrerStatsSql { get; set; }
 

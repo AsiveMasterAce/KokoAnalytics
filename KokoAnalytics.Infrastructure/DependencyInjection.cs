@@ -16,6 +16,7 @@ public static class DependencyInjection
         services.AddScoped<IDailyStatRepository, DailyStatRepository>();
         services.AddScoped<IPageViewRepository, PageViewRepository>();
         services.AddScoped<IReferrerRepository, ReferrerRepository>();
+        services.AddScoped<IPathRepository, PathRepository>();
 
         return services;
     }
