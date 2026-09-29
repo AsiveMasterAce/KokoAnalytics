@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using KokoAnalytics.Application.DTOs;
 using KokoAnalytics.Application.Interfaces;
@@ -25,19 +26,22 @@ public class WordPressImportService : IImportService
 
     public async Task<ImportResultDto> ImportFromRawDumpAsync(string rawSql)
     {
+        if (LooksLikeNdjsonExport(rawSql))
+            return await ImportFromNdjsonAsync(rawSql);
+
         var result = new ImportResultDto();
         var model = SplitByTableName(rawSql);
 
         if (string.IsNullOrWhiteSpace(model.SiteStatsSql))
-            result.Warnings.Add("No site_stats data found � daily visitor summary won't be imported.");
+            result.Warnings.Add("No site_stats data found - daily visitor summary won't be imported.");
         if (string.IsNullOrWhiteSpace(model.PostStatsSql))
-            result.Warnings.Add("No post_stats data found � page view breakdown won't be imported.");
+            result.Warnings.Add("No post_stats data found - page view breakdown won't be imported.");
         if (string.IsNullOrWhiteSpace(model.PathsSql))
-            result.Warnings.Add("No paths data found � pages will show as \"Post #<id>\" instead of their real page name.");
+            result.Warnings.Add("No paths data found - pages will show as \"Post #<id>\" instead of their real page name.");
         if (string.IsNullOrWhiteSpace(model.ReferrerUrlsSql))
-            result.Warnings.Add("No referrer_urls data found � referrer names may show as \"unknown\".");
+            result.Warnings.Add("No referrer_urls data found - referrer names may show as \"unknown\".");
         if (string.IsNullOrWhiteSpace(model.ReferrerStatsSql))
-            result.Warnings.Add("No referrer_stats data found � referrer traffic won't be imported.");
+            result.Warnings.Add("No referrer_stats data found - referrer traffic won't be imported.");
 
         if (!string.IsNullOrWhiteSpace(model.SiteStatsSql))
         {
@@ -153,6 +157,208 @@ public class WordPressImportService : IImportService
     private static string Append(string? existing, string newValue) =>
         string.IsNullOrWhiteSpace(existing) ? newValue : existing + "\n" + newValue;
 
+    private async Task<ImportResultDto> ImportFromNdjsonAsync(string ndjson)
+    {
+        var result = new ImportResultDto();
+        var pathsLookup = new Dictionary<int, string>();
+        var referrerLookup = new Dictionary<int, string>();
+        var siteStats = new List<DailyStat>();
+        var pageViews = new List<PageView>();
+        var referrers = new List<Referrer>();
+
+        string? currentTable = null;
+        List<string> currentColumns = [];
+        var lineNumber = 0;
+
+        foreach (var rawLine in ndjson.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries))
+        {
+            lineNumber++;
+            var line = rawLine.Trim();
+            if (line.Length == 0)
+                continue;
+
+            try
+            {
+                using var document = JsonDocument.Parse(line);
+                var root = document.RootElement;
+
+                if (TryReadTableDeclaration(root, out var table, out var columns))
+                {
+                    currentTable = table;
+                    currentColumns = columns;
+                    continue;
+                }
+
+                if (currentTable is null || root.ValueKind != JsonValueKind.Array)
+                {
+                    result.Errors.Add($"NDJSON line {lineNumber}: row data appeared before a table declaration.");
+                    continue;
+                }
+
+                foreach (var row in root.EnumerateArray())
+                {
+                    if (row.ValueKind != JsonValueKind.Array || row.GetArrayLength() != currentColumns.Count)
+                    {
+                        result.Errors.Add($"NDJSON line {lineNumber}: row does not match the declared columns for {currentTable}.");
+                        continue;
+                    }
+
+                    var values = row.EnumerateArray().Select(GetJsonScalarValue).ToList();
+                    ImportNdjsonRow(currentTable, currentColumns, values, pathsLookup, referrerLookup, siteStats, pageViews, referrers);
+                }
+            }
+            catch (JsonException ex)
+            {
+                result.Errors.Add($"NDJSON line {lineNumber}: invalid JSON - {ex.Message}");
+            }
+            catch (Exception ex)
+            {
+                result.Errors.Add($"NDJSON line {lineNumber}: couldn't read row - {ex.Message}");
+            }
+        }
+
+        if (siteStats.Count == 0)
+            result.Warnings.Add("No site_stats data found - daily visitor summary won't be imported.");
+        if (pageViews.Count == 0)
+            result.Warnings.Add("No post_stats data found - page view breakdown won't be imported.");
+        if (pathsLookup.Count == 0)
+            result.Warnings.Add("No paths data found - pages may show as unknown.");
+        if (referrerLookup.Count == 0)
+            result.Warnings.Add("No referrer_labels data found - referrer names may show as unknown.");
+        if (referrers.Count == 0)
+            result.Warnings.Add("No referrer_stats data found - referrer traffic won't be imported.");
+
+        var existingDates = await _dailyStatRepo.GetExistingDatesAsync();
+        var newSiteStats = siteStats.Where(s => !existingDates.Contains(s.Date)).ToList();
+        var skippedSiteStats = siteStats.Count - newSiteStats.Count;
+        if (skippedSiteStats > 0)
+            result.Errors.Add($"Site stats: {skippedSiteStats} date(s) already existed and were skipped.");
+
+        await _dailyStatRepo.AddRangeAsync(newSiteStats);
+        await _pageViewRepo.AddRangeAsync(pageViews);
+        await _referrerRepo.AddRangeAsync(referrers);
+        await _dailyStatRepo.SaveChangesAsync();
+        await _pageViewRepo.SaveChangesAsync();
+        await _referrerRepo.SaveChangesAsync();
+
+        result.SiteStatsCount = newSiteStats.Count;
+        result.PostStatsCount = pageViews.Count;
+        result.ReferrerUrlsCount = referrerLookup.Count;
+        result.ReferrerStatsCount = referrers.Count;
+        result.TotalRows = result.SiteStatsCount + result.PostStatsCount + result.ReferrerStatsCount;
+        result.Success = result.Errors.Count == 0 && result.TotalRows > 0;
+
+        return result;
+    }
+
+    private static bool LooksLikeNdjsonExport(string input)
+    {
+        var firstLine = input.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries)
+            .FirstOrDefault()?.Trim();
+        return firstLine?.StartsWith("{\"table\"", StringComparison.OrdinalIgnoreCase) == true
+            || firstLine?.StartsWith("{\"columns\"", StringComparison.OrdinalIgnoreCase) == true
+            || input.Contains("\"table\":\"koko_analytics_", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool TryReadTableDeclaration(JsonElement root, out string table, out List<string> columns)
+    {
+        table = string.Empty;
+        columns = [];
+
+        if (root.ValueKind != JsonValueKind.Object
+            || !root.TryGetProperty("table", out var tableElement)
+            || !root.TryGetProperty("columns", out var columnsElement)
+            || tableElement.ValueKind != JsonValueKind.String
+            || columnsElement.ValueKind != JsonValueKind.Array)
+        {
+            return false;
+        }
+
+        table = tableElement.GetString() ?? string.Empty;
+        columns = columnsElement.EnumerateArray()
+            .Where(c => c.ValueKind == JsonValueKind.String)
+            .Select(c => c.GetString() ?? string.Empty)
+            .ToList();
+        return table.Length > 0 && columns.Count == columnsElement.GetArrayLength();
+    }
+
+    private static string GetJsonScalarValue(JsonElement element) =>
+        element.ValueKind switch
+        {
+            JsonValueKind.String => element.GetString() ?? string.Empty,
+            JsonValueKind.Number => element.GetRawText(),
+            JsonValueKind.True => "true",
+            JsonValueKind.False => "false",
+            JsonValueKind.Null => string.Empty,
+            _ => element.GetRawText()
+        };
+
+    private static void ImportNdjsonRow(
+        string table,
+        List<string> columns,
+        List<string> values,
+        Dictionary<int, string> pathsLookup,
+        Dictionary<int, string> referrerLookup,
+        List<DailyStat> siteStats,
+        List<PageView> pageViews,
+        List<Referrer> referrers)
+    {
+        string Get(string column)
+        {
+            var index = columns.FindIndex(c => c.Equals(column, StringComparison.OrdinalIgnoreCase));
+            return index >= 0 && index < values.Count ? values[index] : string.Empty;
+        }
+
+        if (table.EndsWith("site_stats", StringComparison.OrdinalIgnoreCase))
+        {
+            var visitors = int.Parse(Get("visitors"));
+            var pageviews = int.Parse(Get("pageviews"));
+            siteStats.Add(new DailyStat
+            {
+                Date = DateTime.Parse(Get("date")),
+                TotalViews = pageviews,
+                TotalVisitors = visitors,
+                BounceRate = visitors > 0 && pageviews > 0
+                    ? Math.Round((decimal)(pageviews - visitors) / pageviews * 100, 2)
+                    : 0
+            });
+        }
+        else if (table.EndsWith("paths", StringComparison.OrdinalIgnoreCase))
+        {
+            pathsLookup[int.Parse(Get("id"))] = Get("path");
+        }
+        else if (table.EndsWith("post_stats", StringComparison.OrdinalIgnoreCase))
+        {
+            var pathId = int.Parse(Get("path_id"));
+            var path = pathsLookup.TryGetValue(pathId, out var knownPath) ? knownPath : $"/unknown-path/{pathId}";
+            pageViews.Add(new PageView
+            {
+                PageUrl = path,
+                PageTitle = PageNameGenerator.GetFriendlyName(path),
+                ViewCount = int.Parse(Get("pageviews")),
+                UniqueVisitors = int.Parse(Get("visitors")),
+                Date = DateTime.Parse(Get("date"))
+            });
+        }
+        else if (table.EndsWith("referrer_labels", StringComparison.OrdinalIgnoreCase)
+            || table.EndsWith("referrer_urls", StringComparison.OrdinalIgnoreCase))
+        {
+            var label = !string.IsNullOrEmpty(Get("value")) ? Get("value") : Get("url");
+            referrerLookup[int.Parse(Get("id"))] = label;
+        }
+        else if (table.EndsWith("referrer_stats", StringComparison.OrdinalIgnoreCase))
+        {
+            var id = int.Parse(Get("id"));
+            var visits = !string.IsNullOrEmpty(Get("unique_hits")) ? Get("unique_hits") : Get("visitors");
+            referrers.Add(new Referrer
+            {
+                ReferrerUrl = referrerLookup.TryGetValue(id, out var url) ? url : $"unknown-referrer-{id}",
+                VisitCount = int.Parse(visits),
+                Date = DateTime.Parse(Get("date"))
+            });
+        }
+    }
+
     private async Task<(int count, List<string> errors)> ImportSiteStatsAsync(string sql)
     {
         var errors = new List<string>();
@@ -182,7 +388,7 @@ public class WordPressImportService : IImportService
             }
             catch (Exception ex)
             {
-                errors.Add($"Site stats: couldn't read row � {ex.Message}");
+                errors.Add($"Site stats: couldn't read row - {ex.Message}");
             }
         }
 
@@ -267,7 +473,7 @@ public class WordPressImportService : IImportService
                 }
                 catch (Exception ex)
                 {
-                    errors.Add($"Post stats: couldn't read row � {ex.Message}");
+                    errors.Add($"Post stats: couldn't read row - {ex.Message}");
                 }
             }
         }
@@ -351,7 +557,7 @@ public class WordPressImportService : IImportService
             }
             catch (Exception ex)
             {
-                errors.Add($"Referrer stats: couldn't read row � {ex.Message}");
+                errors.Add($"Referrer stats: couldn't read row - {ex.Message}");
             }
         }
 

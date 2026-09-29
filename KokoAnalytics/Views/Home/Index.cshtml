@@ -119,12 +119,14 @@
                 <div class="card-header d-flex justify-content-between border-0 bg-white">
                     <h6 class="mb-0" style="color:var(--koko-deep);">Views &amp; Visitors Over Time</h6>
                     <div class="btn-group btn-group-sm" role="group" id="chartToggle">
-                        <button type="button" class="btn btn-outline-koko active" onclick="setChartType('line')">Line</button>
-                        <button type="button" class="btn btn-outline-koko" onclick="setChartType('bar')">Bar</button>
+                        <button type="button" class="btn btn-outline-koko active" onclick="setChartType('line', this)">Line</button>
+                        <button type="button" class="btn btn-outline-koko" onclick="setChartType('bar', this)">Bar</button>
                     </div>
                 </div>
                 <div class="card-body">
-                    <canvas id="trafficChart" height="90"></canvas>
+                    <div class="chart-frame chart-frame-main">
+                        <canvas id="trafficChart"></canvas>
+                    </div>
                 </div>
             </div>
         </div>
@@ -134,8 +136,10 @@
                 <div class="card-header border-0 bg-white">
                     <h6 class="mb-0" style="color:var(--koko-deep);">Referrer Sources</h6>
                 </div>
-                <div class="card-body d-flex align-items-center justify-content-center">
-                    <canvas id="referrerDoughnut"></canvas>
+                <div class="card-body">
+                    <div class="chart-frame chart-frame-referrer">
+                        <canvas id="referrerDoughnut"></canvas>
+                    </div>
                 </div>
             </div>
         </div>
@@ -145,11 +149,14 @@
     <div class="row g-3 mb-4">
         <div class="col-12">
             <div class="card border-0 shadow-sm">
-                <div class="card-header border-0 bg-white">
+                <div class="card-header d-flex align-items-center justify-content-between border-0 bg-white">
                     <h6 class="mb-0" style="color:var(--koko-deep);">Daily Bounce Rate (%)</h6>
+                    <small class="text-muted">Average @Model.AvgBounceRateInRange.ToString("F1")%</small>
                 </div>
                 <div class="card-body">
-                    <canvas id="bounceChart" height="60"></canvas>
+                    <div class="chart-frame chart-frame-bounce">
+                        <canvas id="bounceChart"></canvas>
+                    </div>
                 </div>
             </div>
         </div>
@@ -165,14 +172,15 @@
                         <h6 class="mb-0" style="color:var(--koko-deep);">Top Pages – Daily Trend</h6>
                     </div>
                     <div class="card-body">
-                        <div class="row g-3">
+                        <div class="sparkline-grid">
                             @for (var i = 0; i < Model.PageSparklines.Count; i++)
                             {
-                                <div class="col-md-4 col-lg">
-                                    <div class="sparkline-box">
-                                        <div class="text-muted small text-truncate mb-1">@Model.PageSparklines[i].PageTitle</div>
-                                        <canvas id="spark-@i" height="40"></canvas>
+                                <div class="sparkline-box">
+                                    <div class="d-flex align-items-baseline justify-content-between gap-2 mb-1">
+                                        <div class="text-muted small text-truncate">@Model.PageSparklines[i].PageTitle</div>
+                                        <strong class="sparkline-total">@Model.PageSparklines[i].DailyViews.Sum().ToString("N0")</strong>
                                     </div>
+                                    <div class="sparkline-canvas"><canvas id="spark-@i"></canvas></div>
                                 </div>
                             }
                         </div>
@@ -306,6 +314,9 @@
         // ── Chart.js global defaults ──
         Chart.defaults.font.family = 'inherit';
         Chart.defaults.color = DEEP;
+        Chart.defaults.animation.duration = 450;
+
+        const compactNumber = new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 });
 
         // ── 1. Traffic line / bar chart ──
         let trafficChart;
@@ -325,9 +336,9 @@
                             fill: type === 'line',
                             tension: 0.35,
                             borderWidth: 2.5,
-                            pointRadius: type === 'line' ? 3 : 0,
+                            pointRadius: 0,
                             pointBackgroundColor: OLIVE,
-                            pointHoverRadius: 5
+                            pointHoverRadius: 4
                         },
                         {
                             label: 'Visitors',
@@ -337,14 +348,15 @@
                             fill: type === 'line',
                             tension: 0.35,
                             borderWidth: 2.5,
-                            pointRadius: type === 'line' ? 3 : 0,
+                            pointRadius: 0,
                             pointBackgroundColor: LIME,
-                            pointHoverRadius: 5
+                            pointHoverRadius: 4
                         }
                     ]
                 },
                 options: {
                     responsive: true,
+                    maintainAspectRatio: false,
                     interaction: { mode: 'index', intersect: false },
                     plugins: {
                         legend: { position: 'top', labels: { usePointStyle: true, padding: 16 } },
@@ -357,22 +369,48 @@
                         }
                     },
                     scales: {
-                        y: { beginAtZero: true, grid: { color: 'rgba(202,213,147,0.3)' } },
-                        x: { grid: { display: false } }
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: 'rgba(36,48,16,0.08)' },
+                            ticks: { callback: value => compactNumber.format(value) }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { autoSkip: true, maxTicksLimit: 9, maxRotation: 0 }
+                        }
                     }
                 }
             });
         }
         buildTrafficChart('line');
 
-        function setChartType(type) {
+        function setChartType(type, button) {
             buildTrafficChart(type);
             document.querySelectorAll('#chartToggle .btn').forEach(b => b.classList.remove('active'));
-            event.target.classList.add('active');
+            button.classList.add('active');
         }
 
         // ── 2. Referrer doughnut ──
-        const doughnutColors = [OLIVE, LIME, SAGE, DARK_TEAL, DEEP, 'rgba(135,163,48,0.4)'];
+        const doughnutColors = [OLIVE, '#3B82A0', '#D6A84B', '#6B5B95', DARK_TEAL, SAGE];
+        const doughnutTotal = refData.reduce((sum, value) => sum + value, 0);
+        const doughnutCenterText = {
+            id: 'doughnutCenterText',
+            afterDraw(chart) {
+                const { ctx, chartArea } = chart;
+                if (!chartArea) return;
+                const x = (chartArea.left + chartArea.right) / 2;
+                const y = (chartArea.top + chartArea.bottom) / 2;
+                ctx.save();
+                ctx.textAlign = 'center';
+                ctx.fillStyle = DEEP;
+                ctx.font = '600 22px inherit';
+                ctx.fillText(doughnutTotal.toLocaleString(), x, y - 2);
+                ctx.fillStyle = '#66705b';
+                ctx.font = '12px inherit';
+                ctx.fillText('referrals', x, y + 17);
+                ctx.restore();
+            }
+        };
         new Chart(document.getElementById('referrerDoughnut'), {
             type: 'doughnut',
             data: {
@@ -385,46 +423,110 @@
                     hoverOffset: 10
                 }]
             },
+            plugins: [doughnutCenterText],
             options: {
                 responsive: true,
-                cutout: '62%',
+                maintainAspectRatio: false,
+                cutout: '66%',
                 plugins: {
-                    legend: { position: 'bottom', labels: { boxWidth: 12, padding: 12, usePointStyle: true } },
-                    tooltip: { backgroundColor: DEEP, titleColor: SAGE, bodyColor: '#fff', cornerRadius: 8 }
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            boxWidth: 10,
+                            padding: 12,
+                            usePointStyle: true,
+                            font: { size: 11 },
+                            generateLabels(chart) {
+                                const dataset = chart.data.datasets[0];
+                                return chart.data.labels.map((label, index) => ({
+                                    text: label.length > 22 ? label.slice(0, 21) + '\u2026' : label,
+                                    fillStyle: dataset.backgroundColor[index],
+                                    strokeStyle: '#fff',
+                                    lineWidth: 2,
+                                    hidden: !chart.getDataVisibility(index),
+                                    index
+                                }));
+                            }
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: DEEP,
+                        titleColor: SAGE,
+                        bodyColor: '#fff',
+                        cornerRadius: 8,
+                        callbacks: {
+                            label: context => {
+                                const value = context.parsed;
+                                const percentage = doughnutTotal ? value / doughnutTotal * 100 : 0;
+                                return ` ${value.toLocaleString()} visits (${percentage.toFixed(1)}%)`;
+                            }
+                        }
+                    }
                 }
             }
         });
 
         // ── 3. Bounce rate bar chart ──
+        const averageBounce = bounceData.length
+            ? bounceData.reduce((sum, value) => sum + value, 0) / bounceData.length
+            : 0;
+        const averageBounceLine = {
+            id: 'averageBounceLine',
+            afterDatasetsDraw(chart) {
+                const yScale = chart.scales.y;
+                const chartArea = chart.chartArea;
+                if (!yScale || !chartArea || !Number.isFinite(averageBounce)) return;
+                const y = yScale.getPixelForValue(averageBounce);
+                const ctx = chart.ctx;
+                ctx.save();
+                ctx.strokeStyle = '#3B82A0';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([6, 5]);
+                ctx.beginPath();
+                ctx.moveTo(chartArea.left, y);
+                ctx.lineTo(chartArea.right, y);
+                ctx.stroke();
+                ctx.restore();
+            }
+        };
         new Chart(document.getElementById('bounceChart'), {
             type: 'bar',
             data: {
                 labels: labels,
                 datasets: [{
-                    label: 'Bounce Rate %',
+                    label: 'Daily bounce rate',
                     data: bounceData,
                     backgroundColor: bounceData.map(v =>
-                        v > 70 ? '#c0392b' :        // red – high bounce
-                        v > 40 ? SAGE :              // sage – medium
-                                 OLIVE),             // olive – healthy
-                    borderRadius: 4,
+                        v > 70 ? '#c0392b' :
+                        v > 40 ? SAGE :
+                                 OLIVE),
+                    borderRadius: 3,
                     borderSkipped: false
                 }]
             },
+            plugins: [averageBounceLine],
             options: {
                 responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
                 plugins: {
                     legend: { display: false },
-                    tooltip: { backgroundColor: DEEP, titleColor: SAGE, bodyColor: '#fff', cornerRadius: 8 }
+                    tooltip: {
+                        backgroundColor: DEEP,
+                        titleColor: SAGE,
+                        bodyColor: '#fff',
+                        cornerRadius: 8,
+                        callbacks: { label: context => ` ${context.dataset.label}: ${context.parsed.y.toFixed(1)}%` }
+                    }
                 },
                 scales: {
                     y: {
                         beginAtZero: true,
                         max: 100,
                         ticks: { callback: v => v + '%' },
-                        grid: { color: 'rgba(202,213,147,0.3)' }
+                        grid: { color: 'rgba(36,48,16,0.08)' }
                     },
-                    x: { grid: { display: false } }
+                    x: { grid: { display: false }, ticks: { autoSkip: true, maxTicksLimit: 12, maxRotation: 0 } }
                 }
             }
         });
@@ -449,7 +551,16 @@
                 },
                 options: {
                     responsive: true,
-                    plugins: { legend: { display: false }, tooltip: { enabled: false } },
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            displayColors: false,
+                            backgroundColor: DEEP,
+                            callbacks: { label: context => ` ${context.parsed.y.toLocaleString()} views` }
+                        }
+                    },
                     scales: { x: { display: false }, y: { display: false, beginAtZero: true } }
                 }
             });
