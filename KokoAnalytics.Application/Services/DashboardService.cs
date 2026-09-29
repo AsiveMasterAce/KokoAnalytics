@@ -1,5 +1,6 @@
 using KokoAnalytics.Application.DTOs;
 using KokoAnalytics.Application.Interfaces;
+using KokoAnalytics.Application.Utilities;
 using KokoAnalytics.Domain.Interfaces;
 
 namespace KokoAnalytics.Application.Services;
@@ -18,6 +19,14 @@ public class DashboardService : IDashboardService
         _dailyStatRepo = dailyStatRepo;
         _pageViewRepo = pageViewRepo;
         _referrerRepo = referrerRepo;
+    }
+
+    /// <summary>
+    /// Gets the display title for a page, resolving "/" to "Home" and other paths to a friendly name
+    /// </summary>
+    private static string GetPageDisplayTitle(string pageUrl)
+    {
+        return PageNameGenerator.GetFriendlyName(pageUrl);
     }
 
     public async Task<DashboardDto> GetDashboardAsync(DateTime? start, DateTime? end)
@@ -53,7 +62,7 @@ public class DashboardService : IDashboardService
             .Select(g => new PageSummaryDto
             {
                 PageUrl = g.Key.PageUrl,
-                PageTitle = g.Key.PageTitle,
+                PageTitle = GetPageDisplayTitle(g.Key.PageUrl),
                 TotalViews = g.Sum(x => x.ViewCount),
                 TotalUniqueVisitors = g.Sum(x => x.UniqueVisitors)
             })
@@ -80,7 +89,7 @@ public class DashboardService : IDashboardService
                 .ToDictionary(s => s.Date, s => s.Views);
             return new PageSparklineDto
             {
-                PageTitle = sparklineData.FirstOrDefault(s => s.PageUrl == url)?.PageTitle ?? url,
+                PageTitle = GetPageDisplayTitle(url),
                 DailyViews = allDates.Select(d => byDate.GetValueOrDefault(d, 0)).ToList()
             };
         }).ToList();
@@ -88,7 +97,7 @@ public class DashboardService : IDashboardService
         // Top referrers
         var referrers = await _referrerRepo.GetByDateRangeAsync(startDate, endDate);
 
-        var topReferrers = referrers
+        var allReferrers = referrers
             .GroupBy(r => r.ReferrerUrl)
             .Select(g => new ReferrerSummaryDto
             {
@@ -96,8 +105,19 @@ public class DashboardService : IDashboardService
                 TotalVisits = g.Sum(x => x.VisitCount)
             })
             .OrderByDescending(r => r.TotalVisits)
-            .Take(10)
             .ToList();
+
+        var topReferrers = allReferrers.Take(10).ToList();
+        var chartReferrers = allReferrers.Take(5).ToList();
+        var otherReferrerVisits = allReferrers.Skip(5).Sum(r => r.TotalVisits);
+        if (otherReferrerVisits > 0)
+        {
+            chartReferrers.Add(new ReferrerSummaryDto
+            {
+                ReferrerUrl = "Other",
+                TotalVisits = otherReferrerVisits
+            });
+        }
 
         return new DashboardDto
         {
@@ -126,8 +146,8 @@ public class DashboardService : IDashboardService
             ChartVisitors = dailyStats.Select(d => d.TotalVisitors).ToList(),
             ChartBounceRates = dailyStats.Select(d => d.BounceRate).ToList(),
 
-            ReferrerLabels = topReferrers.Take(6).Select(r => TruncateUrl(r.ReferrerUrl)).ToList(),
-            ReferrerData = topReferrers.Take(6).Select(r => r.TotalVisits).ToList(),
+            ReferrerLabels = chartReferrers.Select(r => FormatReferrerLabel(r.ReferrerUrl)).ToList(),
+            ReferrerData = chartReferrers.Select(r => r.TotalVisits).ToList(),
 
             TopPages = topPages,
             TopReferrers = topReferrers,
@@ -135,17 +155,17 @@ public class DashboardService : IDashboardService
         };
     }
 
-    private static string TruncateUrl(string url)
+    private static string FormatReferrerLabel(string url)
     {
         if (string.IsNullOrEmpty(url)) return "(direct)";
+        if (url == "Other") return url;
         try
         {
-            var host = new Uri(url).Host.Replace("www.", "");
-            return host.Length > 20 ? host[..20] + "…" : host;
+            return new Uri(url).Host.Replace("www.", "");
         }
         catch
         {
-            return url.Length > 25 ? url[..25] + "…" : url;
+            return url;
         }
     }
 }

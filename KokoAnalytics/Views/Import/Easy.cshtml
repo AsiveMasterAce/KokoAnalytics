@@ -5,7 +5,7 @@
 
 <div class="container">
     <h1 class="mb-2">📥 Easy Import</h1>
-    <p class="text-muted mb-4">Paste your entire WordPress database export below — we'll figure out the rest.</p>
+    <p class="text-muted mb-4">Paste your entire Koko Analytics export below — SQL and NDJSON exports are both supported.</p>
 
     <!-- Step-by-step guide -->
     <div class="card bg-light mb-4 border-0 shadow-sm">
@@ -29,7 +29,7 @@
                             <div class="display-6 mb-2">2️⃣</div>
                             <h6>Export the tables</h6>
                             <p class="text-muted small mb-0">
-                                Select your WordPress database → click <strong>Export</strong> → choose <strong>SQL</strong> format → click <strong>Go</strong>.
+                                From Koko Analytics settings, export your data. Newer versions download an <code>.ndjson</code> file; older versions may export SQL.
                             </p>
                         </div>
                     </div>
@@ -40,7 +40,7 @@
                             <div class="display-6 mb-2">3️⃣</div>
                             <h6>Paste below</h6>
                             <p class="text-muted small mb-0">
-                                Open the downloaded <code>.sql</code> file in Notepad, <strong>Select All</strong> → <strong>Copy</strong> → <strong>Paste</strong> below.
+                                Open the downloaded <code>.ndjson</code> or <code>.sql</code> file in Notepad, <strong>Select All</strong> → <strong>Copy</strong> → <strong>Paste</strong> below.
                             </p>
                         </div>
                     </div>
@@ -107,14 +107,14 @@
     <!-- Paste area -->
     <div class="card mb-4 shadow-sm">
         <div class="card-header d-flex justify-content-between align-items-center">
-            <strong>Paste your SQL export here</strong>
-            <span class="badge bg-secondary">Auto-detects all 4 Koko Analytics tables</span>
+            <strong>Paste your Koko Analytics export here</strong>
+            <span class="badge bg-secondary">Auto-detects SQL and NDJSON exports</span>
         </div>
         <div class="card-body">
             <textarea id="rawSqlInput" class="form-control font-monospace" rows="16"
                       placeholder="Just paste everything here.
 
-It's OK if there are CREATE TABLE, DROP TABLE, or other statements mixed in — we only read the INSERT INTO lines for Koko Analytics tables."></textarea>
+For NDJSON exports, paste the whole file. For SQL exports, it's OK if there are CREATE TABLE, DROP TABLE, or other statements mixed in — we only read the Koko Analytics data."></textarea>
         </div>
     </div>
 
@@ -144,25 +144,60 @@ It's OK if there are CREATE TABLE, DROP TABLE, or other statements mixed in — 
     const dashboardUrl = '@Url.Action("Index", "Home")';
 
     const tables = [
-        { key: 'site_stats',    badge: 'badgeSiteStats',  panel: 'detectSiteStats',  label: 'Daily Stats' },
-        { key: 'post_stats',    badge: 'badgePostStats',  panel: 'detectPostStats',  label: 'Page Views' },
-        { key: 'referrer_urls', badge: 'badgeRefUrls',    panel: 'detectRefUrls',    label: 'Referrer URLs' },
-        { key: 'referrer_stats',badge: 'badgeRefStats',   panel: 'detectRefStats',   label: 'Referrer Stats' }
+        { keys: ['site_stats'],                         badge: 'badgeSiteStats',  panel: 'detectSiteStats',  label: 'Daily Stats' },
+        { keys: ['post_stats'],                         badge: 'badgePostStats',  panel: 'detectPostStats',  label: 'Page Views' },
+        { keys: ['referrer_urls', 'referrer_labels'],   badge: 'badgeRefUrls',    panel: 'detectRefUrls',    label: 'Referrer URLs' },
+        { keys: ['referrer_stats'],                     badge: 'badgeRefStats',   panel: 'detectRefStats',   label: 'Referrer Stats' }
     ];
 
-    // Count INSERT rows for a table pattern
-    function countRows(sql, tableKey) {
+    function countRows(input, tableKeys) {
+        if (looksLikeNdjson(input)) {
+            return countNdjsonRows(input, tableKeys);
+        }
+
+        const tablePattern = tableKeys.join('|');
         const pattern = new RegExp(
-            'INSERT\\s+INTO\\s+[`"]?\\w*' + tableKey + '[`"]?\\s*(?:\\([^)]*\\)\\s*)?VALUES\\s*(.*?);',
+            'INSERT\\s+INTO\\s+[`"]?\\w*(' + tablePattern + ')[`"]?\\s*(?:\\([^)]*\\)\\s*)?VALUES\\s*(.*?);',
             'gis'
         );
         let total = 0;
         let match;
         while ((match = pattern.exec(sql)) !== null) {
-            const valuesBlock = match[1];
+            const valuesBlock = match[2];
             const tuples = valuesBlock.match(/\([^)]+\)/g);
             total += tuples ? tuples.length : 0;
         }
+        return total;
+    }
+
+    function looksLikeNdjson(input) {
+        const firstLine = input.split(/\r?\n/).find(line => line.trim());
+        return firstLine && firstLine.trim().startsWith('{"table"');
+    }
+
+    function countNdjsonRows(input, tableKeys) {
+        let activeTable = '';
+        let total = 0;
+
+        input.split(/\r?\n/).forEach(line => {
+            line = line.trim();
+            if (!line) return;
+
+            try {
+                const data = JSON.parse(line);
+                if (!Array.isArray(data) && data.table) {
+                    activeTable = data.table;
+                    return;
+                }
+
+                if (Array.isArray(data) && tableKeys.some(key => activeTable.includes(key))) {
+                    total += data.length;
+                }
+            } catch {
+                // Server-side import will return the exact parse error after submit.
+            }
+        });
+
         return total;
     }
 
@@ -188,7 +223,7 @@ It's OK if there are CREATE TABLE, DROP TABLE, or other statements mixed in — 
         let warnings = [];
 
         tables.forEach(t => {
-            const count = countRows(sql, t.key);
+            const count = countRows(sql, t.keys);
             const badge = document.getElementById(t.badge);
             const panel = document.getElementById(t.panel);
 

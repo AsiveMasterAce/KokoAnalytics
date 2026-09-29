@@ -17,7 +17,7 @@ public class ReferrerRepository : IReferrerRepository
     public async Task<List<Referrer>> GetByDateRangeAsync(DateTime start, DateTime end)
     {
         return await _context.Referrers
-            .Where(r => r.Date >= start && r.Date <= end)
+            .Where(r => r.Date >= start.Date && r.Date < end.Date.AddDays(1))
             .ToListAsync();
     }
 

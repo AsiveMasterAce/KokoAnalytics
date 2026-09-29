@@ -17,7 +17,7 @@ public class PageViewRepository : IPageViewRepository
     public async Task<List<PageView>> GetByDateRangeAsync(DateTime start, DateTime end)
     {
         return await _context.PageViews
-            .Where(p => p.Date >= start && p.Date <= end)
+            .Where(p => p.Date >= start.Date && p.Date < end.Date.AddDays(1))
             .ToListAsync();
     }
 

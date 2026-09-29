@@ -30,6 +30,7 @@ public class ImportController : Controller
             {
                 SiteStatsSql = model.SiteStatsSql,
                 PostStatsSql = model.PostStatsSql,
+                PathsSql = model.PathsSql,
                 ReferrerUrlsSql = model.ReferrerUrlsSql,
                 ReferrerStatsSql = model.ReferrerStatsSql
             };

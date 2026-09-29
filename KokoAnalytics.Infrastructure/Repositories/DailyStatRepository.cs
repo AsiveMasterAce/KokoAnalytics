@@ -17,7 +17,7 @@ public class DailyStatRepository : IDailyStatRepository
     public async Task<List<DailyStat>> GetByDateRangeAsync(DateTime start, DateTime end)
     {
         return await _context.DailyStats
-            .Where(d => d.Date >= start && d.Date <= end)
+            .Where(d => d.Date >= start.Date && d.Date < end.Date.AddDays(1))
             .OrderBy(d => d.Date)
             .ToListAsync();
     }
